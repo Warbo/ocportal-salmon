@@ -1,0 +1,48 @@
+<?php 
+
+class Hook_news
+{
+	
+	/**
+	 * Whether we accept Salmon entries; replies to these posts from downstream
+	 * consumers and aggregators.
+	 *
+	 * @return boolean		Whether a Salmon link should be made available for this feed.
+	 */
+	function salmon_enabled()
+	{
+		return true;
+	}
+	
+	/**
+	 * Grabs details for this type of resource and sends them to the Salmon
+	 * parser.
+	 *
+	 * @param  string		The ID of the resource this salmon is for
+	 */
+	function handle_salmon($id)
+	{
+		// Find out what the type our feedback should be for
+		require_code('hooks/systems/content_meta_aware/news');
+		$cma = object_factory('Hook_content_meta_aware_news');
+		$info = $cma->info();
+
+		$db_id = $info['id_field_numeric']? intval($id) : $id;
+		$_title = $GLOBALS['SITE_DB']->query_value_null_ok($info['table'],$info['title_field'],array($info['id_field']=>$db_id));
+		if (is_null($_title))
+		{
+			warn_exit('');
+		}
+		$title = $info['title_field_dereference']? get_translated_text($_title) : $_title;
+
+		require_code('urls');
+		list($zone, $attributes, $_) = page_link_decode(str_replace('_WILD',$id,$info['view_pagelink_pattern']));
+		$url = build_url($attributes,$zone)->evaluate();
+
+		require_code('salmon/salmon');
+		parse_salmon_post($info['feedback_type_code'], filter_naughty($id), $url, $title);
+	}
+
+}
+
+
