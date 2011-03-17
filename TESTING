@@ -1,0 +1,64 @@
+In my travels I haven't been able to find a service for posting Salmon to a feed
+for testing purposes. However, it's not too difficult if you read the specs. The
+following recipe works nicely for UNIXy systems :)
+
+1) Open a Python shell
+
+2) Create your Salmon content. This is an ATOM feed, with a property
+"in-reply-to" from the ATOM Threading extension. An example is given in the
+Salmon specs, but you may want to change this in-reply-to ID.
+
+3) Put this content into a variable in your Python shell. Use triple quotes,
+like this:
+
+atom="""<?xml version='1.0' encoding='UTF-8'?>
+<entry xmlns='http://www.w3.org/2005/Atom'>
+  <id>tag:example.com,2009:cmt-0.44775718</id>
+  <author><name>test@example.com</name><uri>bob@example.com</uri></author>
+  <thr:in-reply-to xmlns:thr='http://purl.org/syndication/thread/1.0'
+    ref='tag:blogger.com,1999:blog-893591374313312737.post-3861663258538857954'>
+    tag:blogger.com,1999:blog-893591374313312737.post-3861663258538857954
+  </thr:in-reply-to>
+  <content>Salmon swim upstream!</content>
+  <title>Salmon swim upstream!</title>
+  <updated>2009-12-18T20:04:03Z</updated>
+</entry>"""
+
+4) Grab the encoding functions we need. Here I'll assign them to short names
+since I'm lazy:
+
+import base64
+b=lambda x:base64.b64encode(x).replace('+','-').replace('/','_')
+import hashlib
+s=hashlib.sha256()
+
+5) Generate the hash. This is the SHA256 hash of the parameters joined by dots.
+It looks like this:
+
+s.update(b(atom)+'.'+b('application/atom+xml')+'.'+b('base64url')+'.'+b('RSA-SHA256'))
+s.hexdigest()
+
+6) Build the Salmon XML
+
+xml = """<?xml version='1.0' encoding='UTF-8'?>
+<me:env xmlns:me='http://salmon-protocol.org/ns/magic-env'>
+  <me:data type='application/atom+xml'>"""+b(atom)+"""</me:data>
+  <me:encoding>base64url</me:encoding>
+  <me:alg>RSA-SHA256</me:alg>
+  <me:sig>"""+s.hexdigest()+"""</me:sig>
+</me:env>"""
+
+7) Grab the Salmon XML
+print xml
+
+8) Send it to your Salmon endpoint via HTTP POST, here we use the cURL command.
+Of course, replace YOUR XML and YOUR URL with the XML you generated in Python
+and the URL of the Salmon endpoint you're posting to.
+(note that this is a Shell command, not a Python command!)
+
+curl -H "Content-Type: application/magic-envelope+xml" -d "YOUR XML" "YOUR URL"
+
+Note that the current ocPortal plugin does not support authentication. Systems
+which do will require you to specify valid credentials, and sign your post with
+an actual key, which is described in more detail in section 6 of the Magic
+Signatires specification.
